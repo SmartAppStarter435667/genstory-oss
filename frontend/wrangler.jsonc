@@ -1,0 +1,17 @@
+// frontend/wrangler.jsonc
+// OpenNext for Cloudflare がビルド時に .open-next/ 以下を生成し、このファイルが参照する。
+// `npm run cf:build` を一度実行してから `wrangler deploy` すること。
+{
+  "name": "genstory-oss-viewer",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-07-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

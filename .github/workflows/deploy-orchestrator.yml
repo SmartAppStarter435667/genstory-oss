@@ -1,0 +1,79 @@
+name: Deploy Orchestrator
+
+# GitHub-hosted runnerでビルド&GHCRへpush(OCI VMの限られたCPU/メモリを
+# ビルドで消費しないため)し、OCI VMに登録したself-hostedランナーが
+# 最新イメージをpullしてコンテナを再起動する2段構成。
+#
+# 前提: docs/github-actions-setup.md の手順でOCI VMにself-hosted runnerを
+# 登録し、ラベル "oci-vm" を付与しておくこと。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "langchain/**"
+      - "infra/docker-compose.yml"
+      - ".github/workflows/deploy-orchestrator.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute lowercase image name
+        id: meta
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}/orchestrator"
+          echo "image=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build & push image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./langchain
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: [self-hosted, oci-vm]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull latest orchestrator image and restart
+        working-directory: infra
+        run: |
+          # .envはgitの管理外・checkoutの外(ホームディレクトリ)に置いてある想定。
+          # 詳細は docs/github-actions-setup.md 参照。
+          docker compose --env-file ~/genstory-secrets/orchestrator.env pull orchestrator
+          docker compose --env-file ~/genstory-secrets/orchestrator.env --profile core up -d
+          docker image prune -f

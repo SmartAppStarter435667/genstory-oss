@@ -1,0 +1,50 @@
+name: CI
+
+# デプロイはしない、型チェック・ビルドのみの軽量チェック。
+# mainへのpush前(PR)にワークフローの壊れやビルドエラーを検知する。
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  workers-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npx tsc --noEmit
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_PUBLIC_API_BASE_URL: "https://placeholder.example.workers.dev"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run build
+
+  orchestrator-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: langchain
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m py_compile story_chain.py orchestrator.py

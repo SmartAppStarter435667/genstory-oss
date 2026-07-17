@@ -70,8 +70,17 @@ npm run dev                  # http://localhost:3000
 npm run cf:deploy
 ```
 
-## 本番デプロイ
+## 本番デプロイ（GitHub Actions）
 
-- OCI VM: `infra/docker-compose.yml` を `--profile core` で常時起動
+`main` へのpushで自動デプロイされます。`.github/workflows/` に3つのワークフローがあります。
+
+| ワークフロー | トリガー | デプロイ先 |
+|---|---|---|
+| `deploy-workers.yml` | `workers/**` | Cloudflare Workers(API Gateway) |
+| `deploy-frontend.yml` | `frontend/**` | Cloudflare Workers(Next.js on OpenNext) |
+| `deploy-orchestrator.yml` | `langchain/**` | GHCR → OCI VM(self-hosted runnerが `docker compose pull` して再起動) |
+
+**初回セットアップは自動化できない部分があります**（Cloudflare APIトークンの発行、GitHub Secretsの登録、OCI VMへのself-hosted runner登録など）。[`docs/github-actions-setup.md`](./docs/github-actions-setup.md) の手順を上から順に実行してください。
+
 - 画像生成: 既定はCloudflare Workers AI。高品質化したい場合のみ別GPUマシンで `--profile sd-gpu`
 - 詳細な設計判断・運用戦略は [`docs/architecture.md`](./docs/architecture.md) の各章を参照
