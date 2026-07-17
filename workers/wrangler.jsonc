@@ -1,0 +1,48 @@
+// wrangler.jsonc — API Gateway Worker (Hono + Durable Objects)
+//
+// 秘密情報(ORCHESTRATOR_TOKEN, WEBHOOK_SECRET)はここに書かず、
+// 以下のコマンドで登録すること:
+//   npx wrangler secret put ORCHESTRATOR_TOKEN
+//   npx wrangler secret put WEBHOOK_SECRET
+{
+  "name": "genstory-oss-api-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "BOOK_SESSION",
+        "class_name": "BookSession"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["BookSession"]
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "BOOK_CACHE",
+      "id": "<KV_NAMESPACE_ID_ここを置き換え>",
+      "preview_id": "<PREVIEW_KV_NAMESPACE_ID_ここを置き換え>"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BOOK_ASSETS",
+      "bucket_name": "genstory-oss-assets"
+    }
+  ],
+  "vars": {
+    // OCI VM(FastAPIオーケストレーター)の公開エンドポイント。IPローテーション等に
+    // 備え、可能であれば固定ドメイン(Cloudflare TunnelやDDNS経由)を推奨。
+    "ORCHESTRATOR_URL": "https://<oci-vm-public-endpoint>:8000"
+  }
+}

@@ -1,0 +1,112 @@
+# docker-compose.yml
+#
+# OCI Always Free (Ampere A1, 2 OCPU / 12GB — 2026年6月改定後の枠) を前提としたサイジング。
+#
+# 使い方:
+#   OCI VM(常時稼働):    docker compose --profile core up -d
+#   別途GPUマシン(任意):  docker compose --profile sd-gpu up -d
+#
+# 12GB環境で core と sd-gpu を同時起動しないこと。画像生成はデフォルトで
+# Cloudflare Workers AI 経由(GPU不要)を使う設計のため、sd-gpu profile は
+# 高品質な自前生成をしたい場合にのみ、別マシン/バーストGPUで有効化する。
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: genstory-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles: ["core"]
+
+  # 初回起動後に一度だけ実行し、必要なモデルをpullするヘルパーコンテナ
+  # 例: docker compose --profile core run --rm ollama-pull
+  ollama-pull:
+    image: ollama/ollama:latest
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        ollama pull llama3.1:8b-instruct-q4_K_M &&
+        ollama pull bge-m3
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    depends_on:
+      - ollama
+    profiles: ["core"]
+
+  orchestrator:
+    build:
+      context: ../langchain
+      dockerfile: Dockerfile
+    container_name: genstory-orchestrator
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M
+      - EMBEDDING_MODEL=bge-m3
+      - MILVUS_LITE_PATH=/data/character_store.db
+      - ORCHESTRATOR_TOKEN=${ORCHESTRATOR_TOKEN}
+      - CF_WEBHOOK_SECRET=${CF_WEBHOOK_SECRET}
+      - WORKERS_AI_ACCOUNT_ID=${WORKERS_AI_ACCOUNT_ID}
+      - WORKERS_AI_API_TOKEN=${WORKERS_AI_API_TOKEN}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME}
+      # 自前ComfyUIを使う場合のみ設定(未設定ならWorkers AIのみ使用)
+      - COMFYUI_URL=${COMFYUI_URL:-}
+    volumes:
+      - milvus_lite_data:/data
+    depends_on:
+      ollama:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+    profiles: ["core"]
+
+  # ---- 以下は任意: GPUを持つ別マシン/バーストGPUインスタンスでのみ有効化 ----
+  # ComfyUIには公式Dockerイメージが存在しない(プロジェクト側が非公式であることを明言)。
+  # ここではコミュニティメンテの yanwk/comfyui-boot を例として使用。
+  # 採用前に最新のREADME/タグを https://hub.docker.com/r/yanwk/comfyui-boot で要確認。
+  comfyui:
+    image: yanwk/comfyui-boot:cu124-slim
+    container_name: genstory-comfyui
+    restart: unless-stopped
+    ports:
+      - "8188:8188"
+    environment:
+      - CLI_ARGS=--listen 0.0.0.0
+    volumes:
+      - sd_models:/root/ComfyUI/models
+      - sd_output:/root/ComfyUI/output
+      - sd_input:/root/ComfyUI/input
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles: ["sd-gpu"]
+
+volumes:
+  ollama_data:
+  milvus_lite_data:
+  sd_models:
+  sd_output:
+  sd_input:
