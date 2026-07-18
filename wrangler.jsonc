@@ -4,6 +4,9 @@
 // 以下のコマンドで登録すること:
 //   npx wrangler secret put ORCHESTRATOR_TOKEN
 //   npx wrangler secret put WEBHOOK_SECRET
+//
+// __KV_NAMESPACE_ID__ は deploy-workers.yml が `terraform output` の値で
+// 自動的に置換する(terraform/kv.tf 参照)。手動編集は不要。
 {
   "name": "genstory-oss-api-gateway",
   "main": "src/index.ts",
@@ -30,8 +33,7 @@
   "kv_namespaces": [
     {
       "binding": "BOOK_CACHE",
-      "id": "<KV_NAMESPACE_ID_ここを置き換え>",
-      "preview_id": "<PREVIEW_KV_NAMESPACE_ID_ここを置き換え>"
+      "id": "__KV_NAMESPACE_ID__"
     }
   ],
   "r2_buckets": [
