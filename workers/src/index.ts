@@ -132,6 +132,15 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", cors());
 
+// ヘルスチェック(CI/CDのデプロイ後検証、外形監視で使用)
+app.get("/health", (c) => {
+  return c.json({
+    status: "ok",
+    service: "genstory-oss-api-gateway",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 /** IPごとに1時間あたりの生成リクエスト数を制限する簡易レート制限 */
 async function checkRateLimit(env: Env, ip: string): Promise<boolean> {
   const hourBucket = new Date().toISOString().slice(0, 13); // "2026-07-16T05"

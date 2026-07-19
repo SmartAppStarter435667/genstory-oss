@@ -77,3 +77,31 @@ jobs:
           docker compose --env-file ~/genstory-secrets/orchestrator.env pull orchestrator
           docker compose --env-file ~/genstory-secrets/orchestrator.env --profile core up -d
           docker image prune -f
+
+      - name: Verify deployment (health check)
+        run: |
+          for i in 1 2 3 4 5 6; do
+            STATUS=$(curl -s -o /tmp/healthz.json -w "%{http_code}" http://localhost:8000/healthz || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "OK (200): $(cat /tmp/healthz.json)"
+              exit 0
+            fi
+            echo "試行 ${i}/6: ステータス ${STATUS}。5秒後に再試行します..."
+            sleep 5
+          done
+          echo "::error::/healthz が6回試行しても200を返しませんでした(最終ステータス: ${STATUS})"
+          echo "::error::docker compose logs orchestrator で詳細を確認してください。"
+          exit 1
+
+      - name: Verify tech stack (LLaMA/Ollama, LangChain, Milvus, image generation)
+        run: |
+          echo "== /stack-check の結果 =="
+          RESPONSE=$(curl -s http://localhost:8000/stack-check)
+          echo "$RESPONSE" | python3 -m json.tool
+
+          OK=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['ok'])")
+          if [ "$OK" != "True" ]; then
+            echo "::error::必須コンポーネント(Ollama/LangChain/Milvus)のいずれかが正常ではありません。上記の詳細を確認してください。"
+            exit 1
+          fi
+          echo "必須コンポーネントは正常です。画像生成経路(Workers AI / ComfyUI)は上記 image_generation を参照してください。"

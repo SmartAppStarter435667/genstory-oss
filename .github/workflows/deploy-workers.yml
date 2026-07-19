@@ -50,9 +50,31 @@ jobs:
         run: npm install
 
       - name: Deploy Worker
+        id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: workers
           command: deploy
+
+      - name: Verify deployment (health check)
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          if [ -z "$DEPLOY_URL" ]; then
+            echo "::error::wrangler-actionからdeployment-urlが取得できませんでした。"
+            exit 1
+          fi
+          echo "確認先: ${DEPLOY_URL}/health"
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -s -o /tmp/health.json -w "%{http_code}" "${DEPLOY_URL}/health" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "OK (200): $(cat /tmp/health.json)"
+              exit 0
+            fi
+            echo "試行 ${i}/5: ステータス ${STATUS}。5秒後に再試行します..."
+            sleep 5
+          done
+          echo "::error::/health が5回試行しても200を返しませんでした(最終ステータス: ${STATUS})"
+          exit 1

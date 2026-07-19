@@ -1,0 +1,76 @@
+name: Brainstorm Story Ideas
+
+# 絵本の「素材」(テーマ・キャラクター・舞台)を定期的にAIでまとめて生成し、
+# content/story-ideas/ へコミット + レビュー用のGitHub Issueを作成する。
+#
+# OCI VM上の既存Ollamaインスタンスを再利用するため、self-hosted runner
+# (ラベル oci-vm)で実行する。docs/github-actions-setup.md 参照。
+
+on:
+  schedule:
+    - cron: "0 21 * * 0" # 毎週月曜 朝6:00 JST (UTC日曜21:00)
+  workflow_dispatch:
+    inputs:
+      count:
+        description: "生成するネタ数"
+        required: false
+        default: "5"
+      theme_hint:
+        description: "テーマのヒント(例: 夏休み, ハロウィン)。空欄可"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  brainstorm:
+    runs-on: [self-hosted, oci-vm]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate story ideas
+        id: generate
+        working-directory: langchain
+        env:
+          OLLAMA_BASE_URL: http://localhost:11434
+          OLLAMA_MODEL: llama3.1:8b-instruct-q4_K_M
+          IDEA_COUNT: ${{ github.event.inputs.count || '5' }}
+          THEME_HINT: ${{ github.event.inputs.theme_hint || '' }}
+        run: python3 brainstorm_ideas.py
+
+      - name: Commit generated ideas
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "content: 絵本ネタ ${{ steps.generate.outputs.idea_count }}件を自動生成"
+          file_pattern: "content/story-ideas/*.json"
+
+      - name: Open review issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = `${{ steps.generate.outputs.output_path }}`;
+            const data = JSON.parse(fs.readFileSync(path, 'utf-8'));
+
+            let body = `AIが生成した絵本ネタ ${data.ideas.length}件です。採用するものにチェックし、必要なら内容を編集してください。\n\n`;
+            for (const idea of data.ideas) {
+              body += `## ${idea.title_hint}\n`;
+              body += `- ID: \`${idea.id}\`\n`;
+              body += `- 対象年齢: ${idea.age_group}\n`;
+              body += `- テーマ: ${idea.theme}\n`;
+              body += `- 舞台: ${idea.setting}\n`;
+              body += `- キャラクター: ${idea.characters.map((c) => c.name).join(', ')}\n`;
+              if (idea.seasonal_tag) body += `- 季節タグ: ${idea.seasonal_tag}\n`;
+              body += `- ひとこと: ${idea.pitch}\n\n`;
+              body += `- [ ] 採用する\n\n---\n\n`;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `絵本ネタ案 ${new Date().toISOString().slice(0, 10)} (${data.ideas.length}件)`,
+              body,
+            });

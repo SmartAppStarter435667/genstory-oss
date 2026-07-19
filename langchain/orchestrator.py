@@ -191,3 +191,75 @@ async def run_pipeline(req: GenerateRequest) -> None:
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}
+
+
+@app.get("/stack-check")
+async def stack_check():
+    """要件で指定された技術(Ollama/LLaMA・Gemma系, LangChain, Milvus, 画像生成経路)が
+    実際に組み込まれ、稼働しているかを確認するための診断エンドポイント。
+    画像生成のControlNet/Stable Diffusionは既定では非搭載(Workers AI経由)のため、
+    どちらの経路が有効かを正直に報告する(嘘をつかない)。"""
+    result: dict[str, Any] = {"ok": True, "components": {}}
+
+    # --- Ollama: 起動していて、LLaMA/Gemma系モデルがpull済みか ---
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')}/api/tags")
+            resp.raise_for_status()
+            models = [m.get("name", "") for m in resp.json().get("models", [])]
+        llm_models = [m for m in models if any(k in m.lower() for k in ("llama", "gemma", "swallow", "elyza"))]
+        embed_models = [m for m in models if "bge" in m.lower() or "embed" in m.lower()]
+        result["components"]["ollama"] = {
+            "status": "ok" if llm_models else "reachable_but_no_expected_models",
+            "all_models": models,
+            "llm_models_detected": llm_models,
+            "embedding_models_detected": embed_models,
+        }
+        if not llm_models:
+            result["ok"] = False
+    except Exception as exc:
+        result["components"]["ollama"] = {"status": "unreachable", "error": str(exc)}
+        result["ok"] = False
+
+    # --- LangChain: importでき、Milvus Liteへ実際にクエリが通るか ---
+    try:
+        import langchain_core  # noqa: F401
+        import langchain_milvus  # noqa: F401
+        import langchain_ollama  # noqa: F401
+        from story_chain import character_store
+
+        character_store.similarity_search(query="stack-check", k=1)
+        result["components"]["langchain_milvus"] = {
+            "status": "ok",
+            "note": "LangChain経由でMilvus Lite(character_profiles collection)への接続を確認",
+        }
+    except Exception as exc:
+        result["components"]["langchain_milvus"] = {"status": "error", "error": str(exc)}
+        result["ok"] = False
+
+    # --- 画像生成経路: Workers AI(既定)かComfyUI(Stable Diffusion+ControlNet、任意)か ---
+    comfyui_reachable = None
+    if COMFYUI_URL:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                r = await client.get(f"{COMFYUI_URL}/system_stats")
+                comfyui_reachable = r.status_code == 200
+        except Exception:
+            comfyui_reachable = False
+
+    result["components"]["image_generation"] = {
+        "active_backend": "comfyui (Stable Diffusion + ControlNet + IP-Adapter, self-hosted)"
+        if COMFYUI_URL
+        else "cloudflare workers ai (flux/sdxl, hosted — ControlNet/IP-Adapterなし)",
+        "comfyui_configured": bool(COMFYUI_URL),
+        "comfyui_reachable": comfyui_reachable,
+        "workers_ai_configured": bool(WORKERS_AI_ACCOUNT_ID and WORKERS_AI_API_TOKEN),
+    }
+    # 画像生成経路はどちらでも正常な構成のため result["ok"] には影響させない
+
+    # --- R2ストレージ: 認証情報が設定されているか(軽量チェック) ---
+    result["components"]["r2_storage"] = {
+        "configured": bool(os.environ.get("R2_ACCESS_KEY_ID")),
+    }
+
+    return result

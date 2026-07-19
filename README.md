@@ -72,13 +72,14 @@ npm run cf:deploy
 
 ## 本番デプロイ（GitHub Actions）
 
-`main` へのpushで自動デプロイされます。`.github/workflows/` に3つのワークフローがあります。
+`main` へのpushで自動デプロイされます。`.github/workflows/` に4つのワークフローがあります。
 
-| ワークフロー | トリガー | デプロイ先 |
+| ワークフロー | トリガー | 内容 |
 |---|---|---|
-| `deploy-workers.yml` | `workers/**` | Cloudflare Workers(API Gateway) |
-| `deploy-frontend.yml` | `frontend/**` | Cloudflare Workers(Next.js on OpenNext) |
-| `deploy-orchestrator.yml` | `langchain/**` | GHCR → OCI VM(self-hosted runnerが `docker compose pull` して再起動) |
+| `deploy-workers.yml` | `workers/**` | KV/R2を自動作成 → Cloudflare Workers(API Gateway)デプロイ → `/health`確認 |
+| `deploy-frontend.yml` | `frontend/**` | Cloudflare Workers(Next.js on OpenNext)デプロイ → `/api/health`確認 |
+| `deploy-orchestrator.yml` | `langchain/**` | GHCR → OCI VM(self-hosted runnerが `docker compose pull` して再起動)→ `/healthz`・`/stack-check`確認 |
+| `brainstorm-content.yml` | 毎週月曜6:00 JST / 手動 | AIが絵本ネタを複数案生成し `content/story-ideas/` へコミット + レビュー用Issueを作成 |
 
 **初回セットアップは自動化できない部分があります**（Cloudflare APIトークンの発行、GitHub Secretsの登録、OCI VMへのself-hosted runner登録など）。[`docs/github-actions-setup.md`](./docs/github-actions-setup.md) の手順を上から順に実行してください。
 

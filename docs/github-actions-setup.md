@@ -109,10 +109,12 @@ docker compose --env-file ~/genstory-secrets/orchestrator.env --profile core run
 ## 動作確認チェックリスト
 
 - [ ] R2が有効化されている(手順1)
-- [ ] `workers/` へのpushで `deploy-workers.yml` が成功し、Cloudflareダッシュボード上にKV namespaceとR2バケットが実在する
-- [ ] `frontend/` へのpushで `deploy-frontend.yml` が成功する
-- [ ] `langchain/` へのpushで `deploy-orchestrator.yml` が成功し、OCI VM上で `docker ps` にorchestratorの新しいコンテナIDが反映される
+- [ ] `workers/` へのpushで `deploy-workers.yml` が成功する(内部で `/health` への自動ヘルスチェックまで実施ずみ)
+- [ ] `frontend/` へのpushで `deploy-frontend.yml` が成功する(内部で `/api/health` への自動ヘルスチェックまで実施ずみ)
+- [ ] `langchain/` へのpushで `deploy-orchestrator.yml` が成功する(内部で `/healthz` と、Ollama/LangChain/Milvusの搭載を確認する `/stack-check` まで実施ずみ。ログの「Verify tech stack」ステップに詳細が出ます)
 - [ ] フロントエンドからフォーム送信 → 生成 → ビューア表示までE2Eで通る
+
+いずれかのワークフローが失敗した場合、該当ステップのログにエラー内容が出るので貼ってください。
 
 ## 参考: なぜnpm ciではなくnpm installにしているか
 
