@@ -46,6 +46,10 @@ services:
     profiles: ["core"]
 
   orchestrator:
+    # GitHub Actions(deploy-orchestrator.yml)がここへpushし、OCI VM上のself-hosted
+    # runnerが `docker compose pull` する。ローカル開発では `build` が使われる
+    # (image:が未pullなら `docker compose build orchestrator` でローカルビルド可能)。
+    image: ${ORCHESTRATOR_IMAGE:-ghcr.io/smartappstarter435667/genstory-book-ai/orchestrator:latest}
     build:
       context: ../langchain
       dockerfile: Dockerfile
