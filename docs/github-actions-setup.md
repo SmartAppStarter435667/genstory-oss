@@ -72,27 +72,42 @@ npx wrangler secret put WEBHOOK_SECRET
 
 `deploy-orchestrator.yml` はOCI VM上で直接コンテナを再起動する必要があるため、OCI VM自体をGitHub Actionsのランナーとして登録します(SSHを外部に開けずに済むための設計です)。
 
-1. GitHubリポジトリ → **Settings → Actions → Runners → New self-hosted runner** → OS: Linux, Arch: ARM64(Ampere A1の場合)
-2. 画面に表示される手順(`./config.sh --url ... --token ...`)をOCI VM上で実行
-3. ラベルを聞かれたら **`oci-vm`** を追加(`deploy-orchestrator.yml` がこのラベルを指定しています)
-4. サービス化して常駐させる:
-   ```bash
-   sudo ./svc.sh install
-   sudo ./svc.sh start
-   ```
+**自動化スクリプトを使う場合(推奨)**: [Personal Access Token](https://github.com/settings/tokens)(repo scope。privateリポジトリの場合必須)を発行し、OCI VM上で以下を実行してください。トークン取得・ダウンロード・登録・systemd常駐化までを一度に行います。
+
+```bash
+cd ~/genstory-book-ai   # リポジトリのcheckout先
+export GITHUB_PAT=ghp_xxxxxxxxxxxx
+export GITHUB_OWNER=SmartAppStarter435667
+export GITHUB_REPO=genstory-book-ai
+./scripts/setup-oci-runner.sh
+```
+
+完了したら、GITHUB_PATはGitHub側([Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens))で失効させてください(登録トークン取得の一度きりの用途のため)。
+
+**手動で行う場合**: GitHubリポジトリ → **Settings → Actions → Runners → New self-hosted runner** → 画面の指示(`./config.sh --url ... --token ...`)に従い、ラベルに **`oci-vm`** を追加した上で `sudo ./svc.sh install && sudo ./svc.sh start` を実行してください。
 
 ## 7. OCI VM側の環境変数ファイルを用意する
 
 `docker compose` の `.env` はgit管理外かつ、self-hosted runnerのcheckoutディレクトリはワークフロー実行のたびにクリーンされる可能性があるため、**checkoutディレクトリの外**に置きます。
 
+**自動化スクリプトを使う場合(推奨)**: OCI VM上で以下を実行すると、対話プロンプトで必要な値を聞かれ、正しいキー名・パーミッション(600)で `~/genstory-secrets/orchestrator.env` を作成します(実際のCloudflareトークン等の値はご自身で用意する必要があります)。
+
+```bash
+cd ~/genstory-book-ai
+./scripts/setup-orchestrator-env.sh
+```
+
+`ORCHESTRATOR_TOKEN` / `CF_WEBHOOK_SECRET` は空Enterでランダム生成されます。それ以外(Cloudflareアカウント関連)は事前に手順2・4で控えた値を入力してください。
+
+**手動で行う場合**:
 ```bash
 mkdir -p ~/genstory-secrets
-cp ~/actions-runner/_work/genstory-book-ai/genstory-book-ai/infra/.env.example ~/genstory-secrets/orchestrator.env
+cp infra/.env.example ~/genstory-secrets/orchestrator.env
 nano ~/genstory-secrets/orchestrator.env   # 実際の値を入力
 chmod 600 ~/genstory-secrets/orchestrator.env
 ```
 
-`deploy-orchestrator.yml` はこのパス(`~/genstory-secrets/orchestrator.env`)を `--env-file` として参照します。
+いずれの方法でも、`deploy-orchestrator.yml` はこのパス(`~/genstory-secrets/orchestrator.env`)を `--env-file` として参照します。
 
 併せて、OCI VMの外(Cloudflare Workers)からこのVMの `/generate` エンドポイントへ到達できるよう、Cloudflare Tunnelで固定ホスト名を割り当てておくことを推奨します(動的IP対策)。
 
