@@ -1,69 +1,45 @@
 # genstory-oss
 
-GenStory相当のAI絵本生成プラットフォームを、OSS（Ollama / LangChain / Milvus Lite / Stable Diffusion系）+ OCI + Cloudflareで構築するプロジェクトです。全体設計は [`docs/architecture.md`](./docs/architecture.md) を参照してください。
+GenStory相当のAI絵本生成プラットフォームです。**v2: Cloudflareのみで完結する構成**(Workers / Workers AI / R2 / KV / Durable Objects)。ストーリー生成は任意でNVIDIA NIM(build.nvidia.com無料枠)を優先使用できます。サーバー・Docker・SSH・Terraform・Ansibleは一切不要で、`wrangler deploy` だけでデプロイが完了します。
+
+> 旧v1(OCI VM + Ollama + LangChain + Milvus + Docker Compose)は、セットアップの複雑さがボトルネックになったため廃止しました。経緯は`docs/architecture.md`冒頭を参照してください。
 
 ## 構成
 
 ```
 genstory-oss/
-├── docs/architecture.md      # 全体アーキテクチャ設計書
-├── infra/docker-compose.yml  # OCI VM側の起動定義
-├── langchain/                # ストーリー生成(LangChain) + オーケストレーター(FastAPI)
-├── workers/                  # API Gateway (Cloudflare Workers / Hono / Durable Objects)
-└── frontend/                 # 絵本ビューアUI (Next.js / OpenNext for Cloudflare)
+├── docs/architecture.md          # 全体アーキテクチャ設計書
+├── docs/github-actions-setup.md  # デプロイに必要なSecrets等のセットアップ手順
+├── workers/                      # API本体 (Cloudflare Workers / Hono / Durable Objects / Workers AI)
+├── frontend/                     # 絵本ビューアUI (Next.js / OpenNext for Cloudflare)
+├── scripts/provision-resources.sh  # KV/R2の自動プロビジョニング(冪等)
+└── content/story-ideas/          # AIが生成した絵本ネタのストック
 ```
 
-## クイックスタート（推奨する順番）
+## クイックスタート
 
-### 1. ストーリー生成を単体で確認する（最初にここから）
-
-```bash
-cd langchain
-pip install -r requirements.txt --break-system-packages
-
-# 別ターミナルでOllamaを起動しておく
-ollama pull llama3.1:8b-instruct-q4_K_M
-ollama pull bge-m3
-
-python story_chain.py
-```
-
-標準出力に絵本のJSON（title / pages[]）が表示されれば成功です。うまく構造化出力が返らない場合は `story_chain.py` 内のコメントを参照し、`PydanticOutputParser` 方式へ切り替えてください。
-
-### 2. オーケストレーター全体をローカルで起動する
-
-```bash
-cd infra
-cp .env.example .env   # なければ作成し、下記の環境変数を設定
-docker compose --profile core up -d
-curl -X POST http://localhost:8000/generate \
-  -H "Authorization: Bearer $ORCHESTRATOR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"bookId":"test-1","webhookUrl":"https://webhook.site/xxxx","theme":"...","ageGroup":"3-5","characters":[{"name":"コン"}]}'
-```
-
-必要な環境変数: `ORCHESTRATOR_TOKEN` `CF_WEBHOOK_SECRET` `WORKERS_AI_ACCOUNT_ID` `WORKERS_AI_API_TOKEN` `R2_ACCOUNT_ID` `R2_ACCESS_KEY_ID` `R2_SECRET_ACCESS_KEY` `R2_BUCKET_NAME`
-
-### 3. Cloudflare側をデプロイする
+### 1. Cloudflare側をデプロイする
 
 ```bash
 cd workers
-npm install hono
-npx wrangler kv namespace create BOOK_CACHE
-npx wrangler r2 bucket create genstory-oss-assets
-npx wrangler secret put ORCHESTRATOR_TOKEN
-npx wrangler secret put WEBHOOK_SECRET
+npm install
 npx wrangler deploy
 ```
 
-`wrangler.jsonc` 内のKV namespace idと `ORCHESTRATOR_URL` を実際の値に置き換えてください。
+初回デプロイ時、`scripts/provision-resources.sh`相当の処理はGitHub Actions側で自動実行されます(手動で`wrangler deploy`する場合は、先にKV namespace / R2 bucketの作成が必要です。`docs/github-actions-setup.md`参照)。
 
-### 4. フロントエンドを起動する
+実行時シークレットを登録:
+```bash
+# 任意: ストーリー生成にNVIDIA NIMを優先使用したい場合のみ
+npx wrangler secret put NVIDIA_NIM_API_KEY
+```
+
+### 2. フロントエンドを起動する
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local   # NEXT_PUBLIC_API_BASE_URL を3.のWorker URLに設定
+cp .env.example .env.local   # NEXT_PUBLIC_API_BASE_URL を1.のWorker URLに設定
 npm run dev                  # http://localhost:3000
 
 # Cloudflareへデプロイする場合
@@ -72,16 +48,20 @@ npm run cf:deploy
 
 ## 本番デプロイ（GitHub Actions）
 
-`main` へのpushで自動デプロイされます。`.github/workflows/` に4つのワークフローがあります。
+`main` へのpushで自動デプロイされます。
 
 | ワークフロー | トリガー | 内容 |
 |---|---|---|
-| `deploy-workers.yml` | `workers/**` | KV/R2を自動作成 → Cloudflare Workers(API Gateway)デプロイ → `/health`確認 |
+| `deploy-workers.yml` | `workers/**` | KV/R2を自動作成 → Cloudflare Workers(API)デプロイ → `/health`確認 |
 | `deploy-frontend.yml` | `frontend/**` | Cloudflare Workers(Next.js on OpenNext)デプロイ → `/api/health`確認 |
-| `deploy-orchestrator.yml` | `langchain/**` | GHCR → OCI VM(self-hosted runnerが `docker compose pull` して再起動)→ `/healthz`・`/stack-check`確認 |
-| `brainstorm-content.yml` | 毎週月曜6:00 JST / 手動 | AIが絵本ネタを複数案生成し `content/story-ideas/` へコミット + レビュー用Issueを作成 |
+| `brainstorm-content.yml` | 毎週月曜6:00 JST / 手動 | AI(Workers AI)が絵本ネタを複数案生成し `content/story-ideas/` へコミット + レビュー用Issueを作成 |
+| `ci.yml` | Pull Request | 型チェック/ビルドのみ(デプロイなし) |
 
-**初回セットアップは自動化できない部分があります**（Cloudflare APIトークンの発行、GitHub Secretsの登録、OCI VMへのself-hosted runner登録など）。[`docs/github-actions-setup.md`](./docs/github-actions-setup.md) の手順を上から順に実行してください。
+初回セットアップの詳細（Cloudflare APIトークン発行、GitHub Secrets登録など）は [`docs/github-actions-setup.md`](./docs/github-actions-setup.md) を参照してください。OCI/Docker/SSHは一切登場しません。
 
-- 画像生成: 既定はCloudflare Workers AI。高品質化したい場合のみ別GPUマシンで `--profile sd-gpu`
-- 詳細な設計判断・運用戦略は [`docs/architecture.md`](./docs/architecture.md) の各章を参照
+## テキスト生成プロバイダ
+
+- 既定: Cloudflare Workers AI(`@cf/meta/llama-3.3-70b-instruct-fp8-fast`)
+- 任意: `NVIDIA_NIM_API_KEY` を設定すると、NVIDIA NIM(`meta/llama-3.3-70b-instruct`等、無料ホスト型API)を優先使用。失敗時/未設定時は自動でWorkers AIにフォールバック
+
+画像生成は既定でCloudflare Workers AI(FLUX)を使用します。詳細な設計判断は [`docs/architecture.md`](./docs/architecture.md) を参照してください。

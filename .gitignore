@@ -4,19 +4,9 @@ node_modules/
 .open-next/
 npm-debug.log*
 
-# Python
-__pycache__/
-*.pyc
-.venv/
-venv/
-
 # 環境変数・秘密情報
 .env
 .env.local
-*.db
-
-# Docker/データ
-infra/data/
 
 # OS
 .DS_Store

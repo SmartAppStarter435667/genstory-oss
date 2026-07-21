@@ -1,9 +1,12 @@
-// wrangler.jsonc — API Gateway Worker (Hono + Durable Objects)
+// wrangler.jsonc — API Gateway Worker (Hono + Durable Objects + Workers AI)
 //
-// 秘密情報(ORCHESTRATOR_TOKEN, WEBHOOK_SECRET)はここに書かず、
-// 以下のコマンドで登録すること:
-//   npx wrangler secret put ORCHESTRATOR_TOKEN
-//   npx wrangler secret put WEBHOOK_SECRET
+// v2: OCI VM連携を廃止。Workers AI(テキスト生成・画像生成)を直接呼び出す
+// 構成のため、外部エンドポイントの秘密情報は不要になった。
+//
+// 任意: ストーリー生成にNVIDIA NIM(build.nvidia.com、無料ホスト型APIはテキスト
+// モデルのみ対応)を優先使用したい場合は以下を設定する(未設定ならWorkers AIのみ使用):
+//   npx wrangler secret put NVIDIA_NIM_API_KEY
+//   (任意) vars.NVIDIA_NIM_MODEL で catalog ID を上書き。既定は "meta/llama-3.3-70b-instruct"
 //
 // __KV_NAMESPACE_ID__ は deploy-workers.yml が scripts/provision-resources.sh の
 // 実行結果で自動的に置換する。手動編集は不要。
@@ -15,6 +18,9 @@
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
+  },
+  "ai": {
+    "binding": "AI"
   },
   "durable_objects": {
     "bindings": [
@@ -41,10 +47,5 @@
       "binding": "BOOK_ASSETS",
       "bucket_name": "genstory-oss-assets"
     }
-  ],
-  "vars": {
-    // OCI VM(FastAPIオーケストレーター)の公開エンドポイント。IPローテーション等に
-    // 備え、可能であれば固定ドメイン(Cloudflare TunnelやDDNS経由)を推奨。
-    "ORCHESTRATOR_URL": "https://<oci-vm-public-endpoint>:8000"
-  }
+  ]
 }

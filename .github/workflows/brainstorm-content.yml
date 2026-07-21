@@ -1,10 +1,9 @@
 name: Brainstorm Story Ideas
 
-# 絵本の「素材」(テーマ・キャラクター・舞台)を定期的にAIでまとめて生成し、
-# content/story-ideas/ へコミット + レビュー用のGitHub Issueを作成する。
+# 絵本の「素材」(テーマ・キャラクター・舞台)を定期的にAI(Cloudflare Workers AI)で
+# まとめて生成し、content/story-ideas/ へコミット + レビュー用のGitHub Issueを作成する。
 #
-# OCI VM上の既存Ollamaインスタンスを再利用するため、self-hosted runner
-# (ラベル oci-vm)で実行する。docs/github-actions-setup.md 参照。
+# v2: Ollama/self-hosted runnerが不要になったため ubuntu-latest で完結する。
 
 on:
   schedule:
@@ -26,20 +25,21 @@ permissions:
 
 jobs:
   brainstorm:
-    runs-on: [self-hosted, oci-vm]
-    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
 
       - name: Generate story ideas
         id: generate
-        working-directory: langchain
         env:
-          OLLAMA_BASE_URL: http://localhost:11434
-          OLLAMA_MODEL: llama3.1:8b-instruct-q4_K_M
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           IDEA_COUNT: ${{ github.event.inputs.count || '5' }}
           THEME_HINT: ${{ github.event.inputs.theme_hint || '' }}
-        run: python3 brainstorm_ideas.py
+        run: |
+          chmod +x scripts/brainstorm-ideas.sh
+          ./scripts/brainstorm-ideas.sh
 
       - name: Commit generated ideas
         uses: stefanzweifel/git-auto-commit-action@v7

@@ -4,6 +4,27 @@
 
 ---
 
+## 📌 v2での方針変更(重要・最初にお読みください)
+
+以下0〜10章は初期設計(v1)の記録として残していますが、**現在の実装(workers/, frontend/)はv2の簡略構成に切り替わっています**。
+
+**v1(本ドキュメントの大部分が説明する内容)**: Cloudflare + OCI VM(Ollama + LangChain + Milvus Lite + FastAPI + Docker Compose) + GitHub Actions self-hosted runner + Terraform(OCI Resource Manager) + Ansible
+
+**v2(現在の実装)**: **Cloudflareのみ**(Workers + Workers AI + R2 + KV + Durable Objects)。任意でNVIDIA NIM(build.nvidia.com無料枠)をテキスト生成に追加可能。
+
+**変更理由**: OCI VMの準備(self-hosted runner登録、SSH接続、Terraform state管理、Ansible設定)がボトルネックとなり、動くものを完成させるまでの時間が想定より大きく伸びたため。Cloudflare Workers AIだけでもストーリー生成・挿絵生成とも実用レベルで動作するため、まずシンプルな構成で完成させ、必要になった時点でMilvus的なキャラクター記憶機能やComfyUI経由の高品質画像生成(要GPU)を追加する方針にしました。
+
+**v1からの主な変更点**:
+- Ollama/LangChain/Milvus Lite/FastAPIオーケストレーター/Docker Compose → **廃止**。ロジックはすべて`workers/src/index.ts`内のTypeScriptに統合
+- OCI VM・self-hosted runner・Terraform(OCI)・Ansible → **廃止**
+- 画像生成: 既定でCloudflare Workers AI(FLUX)。ControlNet/Stable Diffusionは、NVIDIA NIMも含め無料のホスト型APIでは提供されておらず(自前GPUでの`docker run`が必要)、当面は見送り
+- ストーリー生成: Cloudflare Workers AI(既定)。`NVIDIA_NIM_API_KEY`を設定すると NVIDIA NIM(無料ホスト型テキストAPI)を優先使用し、失敗時はWorkers AIへ自動フォールバック
+- キャラクターの長期記憶(Milvusが担っていた機能)は現状未実装。1冊の生成内ではキャラクター設定をそのままプロンプトに含める方式で対応
+
+現在の構成の詳細は [`README.md`](../README.md) と [`github-actions-setup.md`](./github-actions-setup.md) を参照してください。以下はv1設計の記録です。
+
+---
+
 ## 0. 設計に入る前に：4つの前提を最新情報で検証
 
 要件をそのまま実装すると本番で詰まる箇所が4つあったため、最新情報を確認したうえで設計に反映しています。
