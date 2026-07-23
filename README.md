@@ -71,8 +71,8 @@ npm run cf:deploy
 生成した絵本は、ページめくり表示に加えて「動画で見る」モードでも楽しめます。追加のサーバー・GPUは不要で、すべてブラウザ内で完結します。
 
 - **演出**: 各ページにKen Burns風のパン/ズームを適用し、下部に字幕を表示
-- **ナレーション**: ブラウザ標準のWeb Speech API(`speechSynthesis`)で日本語読み上げ。APIキー不要
+- **ナレーション**: 既定はブラウザ標準のWeb Speech API(`speechSynthesis`)で日本語読み上げ。APIキー不要。`GOOGLE_TTS_API_KEY`を設定すると、生成時にGoogle Cloud TTSでページごとの実音声ファイルを作成し、それを優先使用する
 - **効果音**: Web Audio APIで手続き的に生成(ページめくり音・場面転換のチャイム等)。音声ファイル不要
-- **動画エクスポート**: `MediaRecorder`でcanvas+効果音を録画し`.webm`としてダウンロード可能。Web Speech APIの音声はブラウザの仕様上ストリームとして録画できないため、**エクスポートした動画には字幕・効果音は入るがナレーション音声は含まれない**(アプリ内での「動画で見る」再生時はナレーション込み)
+- **動画エクスポート**: `MediaRecorder`でcanvas+音声を録画し`.webm`としてダウンロード可能。`GOOGLE_TTS_API_KEY`未設定時(Web Speech APIのみ)は、ブラウザの仕様上その音声をストリームとして録画できないため、エクスポートした動画は**字幕+効果音のみ**(ナレーション音声なし)。`GOOGLE_TTS_API_KEY`設定時は、生成済みの実音声ファイルを録画に含められるため**ナレーション音声入りの動画をエクスポート可能**
 
-実装は `frontend/components/MovieMode.tsx`、`frontend/lib/narration.ts`、`frontend/lib/soundEffects.ts` を参照してください。
+実装は `frontend/components/MovieMode.tsx`、`frontend/lib/narration.ts`、`frontend/lib/soundEffects.ts`、Worker側のナレーション音声生成は `workers/src/index.ts` の `generateNarrationAudio` を参照してください。

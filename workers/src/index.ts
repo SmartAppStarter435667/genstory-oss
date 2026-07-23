@@ -26,6 +26,12 @@ export interface Env {
   // 失敗時/未設定時はWorkers AIへフォールバックする。
   NVIDIA_NIM_API_KEY?: string;
   NVIDIA_NIM_MODEL?: string;
+  // 任意: 設定されていればページごとのナレーション音声(MP3)をGoogle Cloud
+  // Text-to-Speechで生成しR2へ保存する。未設定ならナレーション音声は生成されず、
+  // フロントエンドはブラウザのWeb Speech APIでの読み上げにフォールバックする
+  // (その場合、動画エクスポートにはナレーション音声を含められない)。
+  GOOGLE_TTS_API_KEY?: string;
+  GOOGLE_TTS_VOICE?: string;
 }
 
 // --- 型定義 ------------------------------------------------------------------
@@ -56,6 +62,7 @@ interface ProgressPayload {
   pageNumber?: number;
   totalPages?: number;
   imageUrl?: string;
+  audioUrl?: string;
   message?: string;
   error?: string;
 }
@@ -280,6 +287,48 @@ JSON形式: {"title": string, "pages": [{"page_number": number, "stage": "起"|"
   return generateStoryWithWorkersAi(env.AI, STORY_SYSTEM_PROMPT, userPrompt);
 }
 
+// --- ナレーション音声生成(Google Cloud Text-to-Speech, 任意) ----------------
+//
+// Cloudflare Workers AIのTTS(@cf/deepgram/aura-1)は英語・スペイン語のみで
+// 日本語非対応のため使えない。ブラウザのWeb Speech APIは動画エクスポート用の
+// ストリームとしてキャプチャできない制約があるため、「ナレーション入り動画を
+// エクスポートしたい」場合のみ、実ファイルを返すGoogle Cloud TTSを使う。
+// 未設定でもアプリ自体は動作する(Web Speech APIでのライブ読み上げにフォールバック)。
+
+const DEFAULT_GOOGLE_TTS_VOICE = "ja-JP-Wavenet-B";
+
+async function generateNarrationAudio(env: Env, text: string): Promise<Uint8Array | null> {
+  if (!env.GOOGLE_TTS_API_KEY) return null;
+
+  const voiceName = env.GOOGLE_TTS_VOICE || DEFAULT_GOOGLE_TTS_VOICE;
+  const res = await fetch(
+    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${env.GOOGLE_TTS_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input: { text },
+        voice: { languageCode: "ja-JP", name: voiceName },
+        audioConfig: { audioEncoding: "MP3", speakingRate: 0.92, pitch: 1.0 },
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    // ナレーション生成に失敗しても絵本生成自体は止めない(字幕+効果音のみで動画は成立する)
+    console.error("Google Cloud TTS error:", res.status, await res.text());
+    return null;
+  }
+
+  const data = (await res.json()) as { audioContent?: string };
+  if (!data.audioContent) return null;
+
+  const binary = atob(data.audioContent);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 // --- 挿絵生成(Workers AI, FLUX) ---------------------------------------------
 
 const ILLUSTRATION_STYLE_SUFFIX =
@@ -325,19 +374,32 @@ async function runGenerationPipeline(env: Env, bookId: string, req: GenerateBook
     await notify({ bookId, status: "illustrating", totalPages: book.pages.length });
 
     for (const page of book.pages) {
-      const image = await generateIllustration(env.AI, page.illustration_prompt);
-      const key = `books/${bookId}/page-${page.page_number}.png`;
+      const [image, audio] = await Promise.all([
+        generateIllustration(env.AI, page.illustration_prompt),
+        generateNarrationAudio(env, page.text),
+      ]);
 
-      await env.BOOK_ASSETS.put(key, image, {
+      const imageKey = `books/${bookId}/page-${page.page_number}.png`;
+      await env.BOOK_ASSETS.put(imageKey, image, {
         httpMetadata: { contentType: "image/png" },
       });
+
+      let audioUrl: string | undefined;
+      if (audio) {
+        const audioKey = `books/${bookId}/page-${page.page_number}.mp3`;
+        await env.BOOK_ASSETS.put(audioKey, audio, {
+          httpMetadata: { contentType: "audio/mpeg" },
+        });
+        audioUrl = `/api/assets/${audioKey}`;
+      }
 
       await notify({
         bookId,
         status: "page_complete",
         pageNumber: page.page_number,
         totalPages: book.pages.length,
-        imageUrl: `/api/assets/${key}`,
+        imageUrl: `/api/assets/${imageKey}`,
+        audioUrl,
       });
     }
 

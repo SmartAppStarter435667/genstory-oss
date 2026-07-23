@@ -40,6 +40,8 @@ interface UseBookSocketResult {
   progress: BookProgress;
   /** ページ番号 → 画像URL のマップ。完成したページから順に埋まっていく */
   pages: Record<number, string>;
+  /** ページ番号 → ナレーション音声URL のマップ(GOOGLE_TTS_API_KEY未設定時は空のまま) */
+  pageAudioUrls: Record<number, string>;
   /** 完成時にWorker側から送られてくる、タイトル・各ページ本文(ナレーション用) */
   bookData: BookData | null;
 }
@@ -47,6 +49,7 @@ interface UseBookSocketResult {
 export function useBookSocket(bookId: string | null, apiBaseUrl: string): UseBookSocketResult {
   const [progress, setProgress] = useState<BookProgress>({ status: "idle" });
   const [pages, setPages] = useState<Record<number, string>>({});
+  const [pageAudioUrls, setPageAudioUrls] = useState<Record<number, string>>({});
   const [bookData, setBookData] = useState<BookData | null>(null);
   const retryCount = useRef(0);
   const statusRef = useRef<BookStatus>("idle");
@@ -73,8 +76,13 @@ export function useBookSocket(bookId: string | null, apiBaseUrl: string): UseBoo
       ws.onmessage = (event: MessageEvent<string>) => {
         const payload: BookProgress = JSON.parse(event.data);
         setProgress(payload);
-        if (payload.status === "page_complete" && payload.pageNumber && payload.imageUrl) {
-          setPages((prev) => ({ ...prev, [payload.pageNumber!]: payload.imageUrl! }));
+        if (payload.status === "page_complete" && payload.pageNumber) {
+          if (payload.imageUrl) {
+            setPages((prev) => ({ ...prev, [payload.pageNumber!]: payload.imageUrl! }));
+          }
+          if (payload.audioUrl) {
+            setPageAudioUrls((prev) => ({ ...prev, [payload.pageNumber!]: payload.audioUrl! }));
+          }
         }
         if (payload.status === "complete" && payload.message) {
           try {
@@ -109,5 +117,5 @@ export function useBookSocket(bookId: string | null, apiBaseUrl: string): UseBoo
     };
   }, [bookId, apiBaseUrl]);
 
-  return { progress, pages, bookData };
+  return { progress, pages, pageAudioUrls, bookData };
 }

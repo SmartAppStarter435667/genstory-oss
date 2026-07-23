@@ -15,19 +15,23 @@ const STATUS_LABEL: Record<string, string> = {
 
 interface Props {
   bookId: string;
-  onComplete: (pages: Record<number, string>, bookData: BookData | null) => void;
+  onComplete: (
+    pages: Record<number, string>,
+    bookData: BookData | null,
+    pageAudioUrls: Record<number, string>,
+  ) => void;
 }
 
 export function GenerationProgress({ bookId, onComplete }: Props) {
-  const { progress, pages, bookData } = useBookSocket(bookId, getApiBaseUrl());
+  const { progress, pages, pageAudioUrls, bookData } = useBookSocket(bookId, getApiBaseUrl());
 
   const completedCount = Object.keys(pages).length;
   const total = progress.totalPages ?? 0;
   const percent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
 
   if (progress.status === "complete") {
-    // 親コンポーネントへ完成ページ・本文データを引き渡し、ビューア表示に切り替える
-    onComplete(pages, bookData);
+    // 親コンポーネントへ完成ページ・本文データ・ナレーション音声URLを引き渡す
+    onComplete(pages, bookData, pageAudioUrls);
   }
 
   return (

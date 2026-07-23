@@ -17,11 +17,17 @@ export default function BookPage({ params }: Props) {
   const { id } = use(params);
   const [completedPages, setCompletedPages] = useState<Record<number, string> | null>(null);
   const [bookData, setBookData] = useState<BookData | null>(null);
+  const [pageAudioUrls, setPageAudioUrls] = useState<Record<number, string>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("movie");
 
-  const handleComplete = (pages: Record<number, string>, data: BookData | null) => {
+  const handleComplete = (
+    pages: Record<number, string>,
+    data: BookData | null,
+    audioUrls: Record<number, string>,
+  ) => {
     setCompletedPages(pages);
     setBookData(data);
+    setPageAudioUrls(audioUrls);
   };
 
   return (
@@ -54,7 +60,7 @@ export default function BookPage({ params }: Props) {
           </div>
 
           {viewMode === "movie" && bookData ? (
-            <MovieMode pages={completedPages} storyPages={bookData.pages} />
+            <MovieMode pages={completedPages} storyPages={bookData.pages} pageAudioUrls={pageAudioUrls} />
           ) : (
             <BookViewer pages={completedPages} />
           )}

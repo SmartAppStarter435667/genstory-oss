@@ -1,12 +1,15 @@
 // frontend/components/MovieMode.tsx
 //
-// 静止画の挿絵を、パン/ズーム(Ken Burns風)・ナレーション(Web Speech API)・
-// 効果音(Web Audio API、音声ファイル不要)・字幕で「動画のように」再生する。
-// ブラウザ内で完結し、追加のサーバー・GPUは一切不要。
+// 静止画の挿絵を、パン/ズーム(Ken Burns風)・ナレーション・効果音(Web Audio API、
+// 音声ファイル不要)・字幕で「動画のように」再生する。ブラウザ内で完結し、
+// 追加のサーバー・GPUは一切不要。
 //
-// 「動画としてダウンロード」は MediaRecorder で canvas+効果音を録画する。
-// Web Speech APIの音声はブラウザの制約上ストリームとして録画できないため、
-// エクスポートした動画にはナレーション音声は含まれない(字幕+効果音のみ)。
+// ナレーションには2つの経路がある:
+//   1. pageAudioUrls(Google Cloud TTSで生成された実音声ファイル)が利用可能な場合、
+//      それを再生する。実ファイルなのでWeb Audio APIのグラフに載せられ、
+//      「動画としてダウンロード」時の録画にも音声を含められる。
+//   2. 利用できない場合はブラウザのWeb Speech APIで読み上げる(ライブ再生のみ、
+//      ブラウザの制約により動画エクスポートには含められない)。
 
 "use client";
 
@@ -19,11 +22,12 @@ import type { StoryPageData } from "@/lib/useBookSocket";
 interface Props {
   pages: Record<number, string>; // pageNumber -> imageUrl
   storyPages: StoryPageData[]; // ナレーション・字幕用の本文
+  pageAudioUrls?: Record<number, string>; // pageNumber -> ナレーション音声URL(任意)
 }
 
 const CANVAS_WIDTH = 1280;
 const CANVAS_HEIGHT = 720;
-const MIN_PAGE_DURATION_MS = 4500; // ナレーション非対応時/短文時の最低表示時間
+const MIN_PAGE_DURATION_MS = 4500; // 音声が無い場合の最低表示時間
 
 const RECORDING_MIME_CANDIDATES = [
   "video/webm;codecs=vp9,opus",
@@ -63,19 +67,25 @@ function wrapText(
   });
 }
 
-export function MovieMode({ pages, storyPages }: Props) {
+export function MovieMode({ pages, storyPages, pageAudioUrls = {} }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imagesRef = useRef<Record<number, HTMLImageElement>>({});
+  const audioBuffersRef = useRef<Record<number, AudioBuffer>>({});
   const soundRef = useRef<SoundEffects | null>(null);
+  const liveAudioCtxRef = useRef<AudioContext | null>(null);
   const stopRequestedRef = useRef(false);
+  const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isPreparingAudio, setIsPreparingAudio] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [exportUnsupported, setExportUnsupported] = useState(false);
 
   const orderedPages = [...storyPages].sort((a, b) => a.page_number - b.page_number);
+  const hasRealNarration = orderedPages.some((p) => pageAudioUrls[p.page_number]);
 
+  // 画像を先読みしておく(captureStream使用時のtainted canvas対策でCORSを明示)
   useEffect(() => {
     orderedPages.forEach(({ page_number }) => {
       if (imagesRef.current[page_number]) return;
@@ -89,13 +99,40 @@ export function MovieMode({ pages, storyPages }: Props) {
 
   useEffect(() => {
     soundRef.current = new SoundEffects();
+    liveAudioCtxRef.current = new (window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     return () => {
       stopRequestedRef.current = true;
       cancelNarration();
+      activeSourceRef.current?.stop();
       soundRef.current?.close();
+      void liveAudioCtxRef.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ナレーション音声ファイルを先読み・デコードしておく(あれば)
+  useEffect(() => {
+    if (!hasRealNarration || !liveAudioCtxRef.current) return;
+    setIsPreparingAudio(true);
+    const ctx = liveAudioCtxRef.current;
+
+    Promise.all(
+      orderedPages.map(async ({ page_number }) => {
+        const url = pageAudioUrls[page_number];
+        if (!url || audioBuffersRef.current[page_number]) return;
+        try {
+          const res = await fetch(`${getApiBaseUrl()}${url}`);
+          const arrayBuffer = await res.arrayBuffer();
+          const decoded = await ctx.decodeAudioData(arrayBuffer);
+          audioBuffersRef.current[page_number] = decoded;
+        } catch (err) {
+          console.error(`ページ${page_number}のナレーション音声の読み込みに失敗:`, err);
+        }
+      }),
+    ).finally(() => setIsPreparingAudio(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasRealNarration]);
 
   const drawFrame = useCallback((pageNumber: number, progress: number, caption: string) => {
     const canvas = canvasRef.current;
@@ -137,14 +174,17 @@ export function MovieMode({ pages, storyPages }: Props) {
     }
   }, []);
 
-  const playPage = useCallback(
-    async (page: StoryPageData, withNarration: boolean) => {
-      if (stopRequestedRef.current) return;
-      soundRef.current?.playPageTurn();
-
+  /** 実音声ファイルがあればそれを、無ければWeb Speech APIで読み上げ、終了までのPromiseを返す */
+  const narratePageAndAnimate = useCallback(
+    async (
+      page: StoryPageData,
+      audioCtx: AudioContext,
+      recordingDestination: MediaStreamAudioDestinationNode | null,
+    ) => {
+      const buffer = audioBuffersRef.current[page.page_number];
       const startTime = performance.now();
-      const targetDuration = Math.max(MIN_PAGE_DURATION_MS, page.text.length * 180);
       let frameId: number;
+      let targetDuration = buffer ? buffer.duration * 1000 : Math.max(MIN_PAGE_DURATION_MS, page.text.length * 180);
 
       const tick = () => {
         const elapsed = performance.now() - startTime;
@@ -156,11 +196,23 @@ export function MovieMode({ pages, storyPages }: Props) {
       };
       tick();
 
-      if (withNarration && isNarrationSupported()) {
+      if (buffer) {
+        await new Promise<void>((resolve) => {
+          const source = audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioCtx.destination);
+          if (recordingDestination) source.connect(recordingDestination);
+          activeSourceRef.current = source;
+          source.onended = () => resolve();
+          source.start();
+        });
+      } else if (!recordingDestination && isNarrationSupported()) {
+        // 録画中でなければWeb Speech APIでライブ読み上げ(録画中は字幕+効果音のみで進行)
         await speak(page.text);
       } else {
         await new Promise((resolve) => setTimeout(resolve, targetDuration));
       }
+
       cancelAnimationFrame(frameId!);
       drawFrame(page.page_number, 1, page.text);
     },
@@ -168,30 +220,33 @@ export function MovieMode({ pages, storyPages }: Props) {
   );
 
   const playAll = useCallback(
-    async (withNarration: boolean) => {
+    async (audioCtx: AudioContext, recordingDestination: MediaStreamAudioDestinationNode | null) => {
       stopRequestedRef.current = false;
-      await waitForVoices();
+      if (!recordingDestination) await waitForVoices();
       soundRef.current?.playSparkle();
       for (const page of orderedPages) {
         if (stopRequestedRef.current) break;
-        await playPage(page, withNarration);
+        soundRef.current?.playPageTurn();
+        await narratePageAndAnimate(page, audioCtx, recordingDestination);
       }
       if (!stopRequestedRef.current) soundRef.current?.playSparkle();
     },
-    [orderedPages, playPage],
+    [orderedPages, narratePageAndAnimate],
   );
 
   const handlePlay = async () => {
-    if (isRecording) return;
+    if (isRecording || !liveAudioCtxRef.current) return;
     setIsPlaying(true);
     await soundRef.current?.resume();
-    await playAll(true);
+    if (liveAudioCtxRef.current.state === "suspended") await liveAudioCtxRef.current.resume();
+    await playAll(liveAudioCtxRef.current, null);
     setIsPlaying(false);
   };
 
   const handleStop = () => {
     stopRequestedRef.current = true;
     cancelNarration();
+    activeSourceRef.current?.stop();
     setIsPlaying(false);
   };
 
@@ -208,13 +263,14 @@ export function MovieMode({ pages, storyPages }: Props) {
     setDownloadUrl(null);
     stopRequestedRef.current = false;
 
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const audioCtx = new AudioCtx();
-    const destination = audioCtx.createMediaStreamDestination();
-    const exportSound = new SoundEffects(audioCtx);
+    const AudioCtx =
+      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const recordingCtx = new AudioCtx();
+    const destination = recordingCtx.createMediaStreamDestination();
+    const exportSound = new SoundEffects(recordingCtx);
     exportSound.connectToDestination(destination);
     const previousSound = soundRef.current;
-    soundRef.current = exportSound; // 録画中はこちらの効果音インスタンスを使う
+    soundRef.current = exportSound;
 
     const canvasStream = (
       canvas as HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream }
@@ -234,8 +290,7 @@ export function MovieMode({ pages, storyPages }: Props) {
     });
 
     recorder.start();
-    // 録画中はWeb Speech(録音不可)を使わず、字幕+効果音のみで進行する
-    await playAll(false);
+    await playAll(recordingCtx, destination);
     recorder.stop();
     await stopped;
 
@@ -243,6 +298,7 @@ export function MovieMode({ pages, storyPages }: Props) {
     setDownloadUrl(URL.createObjectURL(blob));
     setIsRecording(false);
     exportSound.close();
+    void recordingCtx.close();
     soundRef.current = previousSound;
   };
 
@@ -265,10 +321,10 @@ export function MovieMode({ pages, storyPages }: Props) {
           <button
             type="button"
             onClick={handlePlay}
-            disabled={isRecording}
+            disabled={isRecording || isPreparingAudio}
             className="rounded-full bg-amber-500 px-6 py-3 text-sm font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            ▶ 動画で見る
+            {isPreparingAudio ? "準備中..." : "▶ 動画で見る"}
           </button>
         ) : (
           <button
@@ -283,14 +339,14 @@ export function MovieMode({ pages, storyPages }: Props) {
         <button
           type="button"
           onClick={handleExport}
-          disabled={isPlaying || isRecording}
+          disabled={isPlaying || isRecording || isPreparingAudio}
           className="rounded-full border border-amber-500 px-6 py-3 text-sm font-semibold text-amber-600 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isRecording ? "動画を作成中..." : "⬇ 動画としてダウンロード"}
         </button>
       </div>
 
-      {!isNarrationSupported() && (
+      {!hasRealNarration && !isNarrationSupported() && (
         <p className="text-center text-xs text-stone-400">
           お使いのブラウザは読み上げに対応していないため、字幕のみで再生します。
         </p>
@@ -308,7 +364,9 @@ export function MovieMode({ pages, storyPages }: Props) {
           download="ehon.webm"
           className="text-sm font-medium text-amber-600 underline underline-offset-2"
         >
-          動画ファイルを保存する(ナレーション音声は含まれません。字幕・効果音入り)
+          {hasRealNarration
+            ? "動画ファイルを保存する(ナレーション音声・字幕・効果音入り)"
+            : "動画ファイルを保存する(ナレーション音声は含まれません。字幕・効果音入り)"}
         </a>
       )}
     </div>

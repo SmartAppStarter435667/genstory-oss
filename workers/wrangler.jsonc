@@ -8,6 +8,12 @@
 //   npx wrangler secret put NVIDIA_NIM_API_KEY
 //   (任意) vars.NVIDIA_NIM_MODEL で catalog ID を上書き。既定は "meta/llama-3.3-70b-instruct"
 //
+// 任意: 動画エクスポートにナレーション音声を含めたい場合はGoogle Cloud TTSを設定する
+// (Workers AIのTTSは日本語非対応、ブラウザのWeb Speech APIは録画用ストリームに
+// キャプチャできないため。未設定でもアプリ・動画再生自体は動作する):
+//   npx wrangler secret put GOOGLE_TTS_API_KEY
+//   (任意) vars.GOOGLE_TTS_VOICE で音声名を上書き。既定は "ja-JP-Wavenet-B"
+//
 // __KV_NAMESPACE_ID__ は deploy-workers.yml が scripts/provision-resources.sh の
 // 実行結果で自動的に置換する。手動編集は不要。
 {

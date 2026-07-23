@@ -65,6 +65,21 @@ Workers AIはR2と違い明示的な「有効化」操作は通常不要です�
 
 NIM呼び出しが失敗した場合は自動的にWorkers AIにフォールバックするため、設定ミスがあってもアプリ自体は動作し続けます。
 
+## 7. (任意)ナレーション入り動画エクスポートにGoogle Cloud TTSを使う
+
+未設定でも「動画で見る」モードはブラウザのWeb Speech APIでナレーション付きで再生できます。ただし**ダウンロードした動画ファイルにナレーション音声を含めたい場合**は、実音声ファイルが必要なためGoogle Cloud TTSの設定が必要です(Cloudflare Workers AIのTTSは日本語非対応のため使えません)。
+
+1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成(未作成の場合)
+2. **APIとサービス → ライブラリ** から **Cloud Text-to-Speech API** を有効化
+3. **APIとサービス → 認証情報 → 認証情報を作成 → APIキー**
+4. 登録:
+   ```bash
+   cd workers
+   npx wrangler secret put GOOGLE_TTS_API_KEY
+   ```
+
+無料枠: Standard音声 月400万文字、WaveNet音声 月100万文字(既定は`ja-JP-Wavenet-B`)。生成に失敗しても絵本自体の生成は止まらず、その場合は字幕+効果音のみの動画になります。
+
 ## 動作確認チェックリスト
 
 - [ ] R2が有効化されている(手順1)
