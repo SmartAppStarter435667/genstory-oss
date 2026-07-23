@@ -65,3 +65,14 @@ npm run cf:deploy
 - 任意: `NVIDIA_NIM_API_KEY` を設定すると、NVIDIA NIM(`meta/llama-3.3-70b-instruct`等、無料ホスト型API)を優先使用。失敗時/未設定時は自動でWorkers AIにフォールバック
 
 画像生成は既定でCloudflare Workers AI(FLUX)を使用します。詳細な設計判断は [`docs/architecture.md`](./docs/architecture.md) を参照してください。
+
+## 動画モード(ブラウザ内完結)
+
+生成した絵本は、ページめくり表示に加えて「動画で見る」モードでも楽しめます。追加のサーバー・GPUは不要で、すべてブラウザ内で完結します。
+
+- **演出**: 各ページにKen Burns風のパン/ズームを適用し、下部に字幕を表示
+- **ナレーション**: ブラウザ標準のWeb Speech API(`speechSynthesis`)で日本語読み上げ。APIキー不要
+- **効果音**: Web Audio APIで手続き的に生成(ページめくり音・場面転換のチャイム等)。音声ファイル不要
+- **動画エクスポート**: `MediaRecorder`でcanvas+効果音を録画し`.webm`としてダウンロード可能。Web Speech APIの音声はブラウザの仕様上ストリームとして録画できないため、**エクスポートした動画には字幕・効果音は入るがナレーション音声は含まれない**(アプリ内での「動画で見る」再生時はナレーション込み)
+
+実装は `frontend/components/MovieMode.tsx`、`frontend/lib/narration.ts`、`frontend/lib/soundEffects.ts` を参照してください。

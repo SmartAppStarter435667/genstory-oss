@@ -20,18 +20,34 @@ export interface BookProgress {
   pageNumber?: number;
   totalPages?: number;
   imageUrl?: string;
+  message?: string;
   error?: string;
+}
+
+export interface StoryPageData {
+  page_number: number;
+  stage: "起" | "承" | "転" | "結";
+  text: string;
+  illustration_prompt: string;
+}
+
+export interface BookData {
+  title: string;
+  pages: StoryPageData[];
 }
 
 interface UseBookSocketResult {
   progress: BookProgress;
   /** ページ番号 → 画像URL のマップ。完成したページから順に埋まっていく */
   pages: Record<number, string>;
+  /** 完成時にWorker側から送られてくる、タイトル・各ページ本文(ナレーション用) */
+  bookData: BookData | null;
 }
 
 export function useBookSocket(bookId: string | null, apiBaseUrl: string): UseBookSocketResult {
   const [progress, setProgress] = useState<BookProgress>({ status: "idle" });
   const [pages, setPages] = useState<Record<number, string>>({});
+  const [bookData, setBookData] = useState<BookData | null>(null);
   const retryCount = useRef(0);
   const statusRef = useRef<BookStatus>("idle");
 
@@ -60,6 +76,13 @@ export function useBookSocket(bookId: string | null, apiBaseUrl: string): UseBoo
         if (payload.status === "page_complete" && payload.pageNumber && payload.imageUrl) {
           setPages((prev) => ({ ...prev, [payload.pageNumber!]: payload.imageUrl! }));
         }
+        if (payload.status === "complete" && payload.message) {
+          try {
+            setBookData(JSON.parse(payload.message) as BookData);
+          } catch (err) {
+            console.error("本文データのパースに失敗しました:", err);
+          }
+        }
       };
 
       ws.onclose = () => {
@@ -86,5 +109,5 @@ export function useBookSocket(bookId: string | null, apiBaseUrl: string): UseBoo
     };
   }, [bookId, apiBaseUrl]);
 
-  return { progress, pages };
+  return { progress, pages, bookData };
 }
