@@ -41,16 +41,16 @@ Workers AIはR2と違い明示的な「有効化」操作は通常不要です�
 | `CLOUDFLARE_API_TOKEN` | 手順2で発行したトークン |
 | `CLOUDFLARE_ACCOUNT_ID` | 手順2で控えたAccount ID |
 
-**Variables**
+**Variables(任意・通常は設定不要)**
 | 名前 | 値 |
 |---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | 手順5で`deploy-workers.yml`を一度動かした後に得られるWorkerのURL |
+| `NEXT_PUBLIC_API_BASE_URL` | 通常は空でよい。`deploy-frontend.yml`がCloudflare APIからworkers.devサブドメインを自動取得しURLを組み立てるため、手動設定は不要になった。独自ドメインを使う等の理由でURLを固定したい場合のみ、ここに明示的に設定すると自動算出より優先される |
 
 ## 5. 初回デプロイ
 
-`workers/`か`frontend/`に何かpushすると、対応するワークフローが自動実行されます。`workers/`側は`scripts/provision-resources.sh`がKV namespace / R2バケットを自動作成するため、事前の手動作成は不要です。
+`workers/`か`frontend/`に何かpushすると、対応するワークフローが自動実行されます。`workers/`側は`scripts/provision-resources.sh`がKV namespace / R2バケットを自動作成するため、事前の手動作成は不要です。`frontend/`側はビルド時にCloudflare APIからAPI GatewayのURLを自動算出するため、手動でのVariable設定は不要です。
 
-デプロイ後に発行されるWorkerのURLを、手順4の`NEXT_PUBLIC_API_BASE_URL` Variableへ反映してください。
+> 過去バージョンでは「`deploy-workers.yml`実行後に手動でVariableを設定する」手順でしたが、Next.jsは`NEXT_PUBLIC_*`をビルド時に埋め込むため、Variableを後から設定しても既存のビルドには反映されない問題がありました。自動算出方式に変更してこの問題を解消しています。
 
 ## 6. (任意)NVIDIA NIMをストーリー生成に使う
 

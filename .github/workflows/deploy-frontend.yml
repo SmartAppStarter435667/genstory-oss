@@ -15,15 +15,53 @@ jobs:
     defaults:
       run:
         working-directory: frontend
-    env:
-      # ビルド時にNext.jsへ埋め込まれる公開URL(Repository Variablesで設定)
-      NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      # NEXT_PUBLIC_API_BASE_URL はNext.jsのビルド時に埋め込まれる値のため、
+      # 「後からRepository Variableを設定」しても既存のビルドには反映されない
+      # (これが過去のエラー原因)。そのためVariable未設定時は、Cloudflare API
+      # から自動でworkers.devサブドメインを取得しURLを組み立てる。
+      # Variableが明示的に設定されていればそちらを優先する(カスタムドメイン等)。
+      - name: Resolve API base URL
+        id: resolve-api-url
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MANUAL_OVERRIDE: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+        run: |
+          if [ -n "$MANUAL_OVERRIDE" ]; then
+            echo "Repository Variableで指定されたURLを使用します: ${MANUAL_OVERRIDE}"
+            echo "NEXT_PUBLIC_API_BASE_URL=${MANUAL_OVERRIDE}" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          echo "NEXT_PUBLIC_API_BASE_URL未設定のため、Cloudflare APIからworkers.devサブドメインを自動取得します..."
+          RESPONSE=$(curl -sf -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain")
+          SUBDOMAIN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('result',{}).get('subdomain',''))" 2>/dev/null || echo "")
+
+          if [ -z "$SUBDOMAIN" ]; then
+            echo "::error::workers.devサブドメインの自動取得に失敗しました。レスポンス: ${RESPONSE}"
+            echo "::error::回避策: Settings > Secrets and variables > Actions > Variables に NEXT_PUBLIC_API_BASE_URL を手動設定してください。"
+            exit 1
+          fi
+
+          API_URL="https://genstory-oss-api-gateway.${SUBDOMAIN}.workers.dev"
+          echo "自動算出したAPI URL: ${API_URL}"
+          echo "NEXT_PUBLIC_API_BASE_URL=${API_URL}" >> "$GITHUB_ENV"
+
+      - name: Verify API base URL is set
+        run: |
+          if [ -z "${NEXT_PUBLIC_API_BASE_URL:-}" ]; then
+            echo "::error::NEXT_PUBLIC_API_BASE_URLが空のままビルドに進もうとしています。処理を中止します。"
+            exit 1
+          fi
+          echo "ビルドに使用するAPI URL: ${NEXT_PUBLIC_API_BASE_URL}"
 
       - run: npm install
 
