@@ -183,7 +183,7 @@ export function MovieMode({ pages, storyPages, pageAudioUrls = {} }: Props) {
     ) => {
       const buffer = audioBuffersRef.current[page.page_number];
       const startTime = performance.now();
-      let frameId: number;
+      let frameId = 0;
       let targetDuration = buffer ? buffer.duration * 1000 : Math.max(MIN_PAGE_DURATION_MS, page.text.length * 180);
 
       const tick = () => {
@@ -213,7 +213,7 @@ export function MovieMode({ pages, storyPages, pageAudioUrls = {} }: Props) {
         await new Promise((resolve) => setTimeout(resolve, targetDuration));
       }
 
-      cancelAnimationFrame(frameId!);
+      cancelAnimationFrame(frameId);
       drawFrame(page.page_number, 1, page.text);
     },
     [drawFrame],

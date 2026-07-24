@@ -20,6 +20,7 @@ export interface BookProgress {
   pageNumber?: number;
   totalPages?: number;
   imageUrl?: string;
+  audioUrl?: string;
   message?: string;
   error?: string;
 }
