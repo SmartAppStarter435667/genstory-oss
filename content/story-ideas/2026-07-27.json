@@ -1,0 +1,109 @@
+{
+  "ideas": [
+    {
+      "id": "1",
+      "title_hint": "森の小さな家",
+      "theme": "環境保護",
+      "age_group": "3-5",
+      "characters": [
+        {
+          "name": "リリー",
+          "visual_description": "小さな女の子",
+          "personality": "好奇心旺盛"
+        },
+        {
+          "name": "森の精霊",
+          "visual_description": "木の葉のようなくつろぎ",
+          "personality": "優しい"
+        }
+      ],
+      "setting": "森",
+      "seasonal_tag": "春",
+      "pitch": "リリーは森で小さな家を見つける。森の精霊と出会い、環境保護の重要性を学ぶ。"
+    },
+    {
+      "id": "2",
+      "title_hint": "宇宙の冒険",
+      "theme": "科学",
+      "age_group": "6-8",
+      "characters": [
+        {
+          "name": "アストロ",
+          "visual_description": "宇宙服を着た少年",
+          "personality": "勇敢"
+        },
+        {
+          "name": "ロボット",
+          "visual_description": "金属のロボット",
+          "personality": "知的"
+        }
+      ],
+      "setting": "宇宙",
+      "seasonal_tag": "夏",
+      "pitch": "アストロとロボットは宇宙を旅し、惑星や星について学ぶ。"
+    },
+    {
+      "id": "3",
+      "title_hint": "海の秘密",
+      "theme": "多様性",
+      "age_group": "9-12",
+      "characters": [
+        {
+          "name": "マリナ",
+          "visual_description": "水着を着た少女",
+          "personality": "好奇心旺盛"
+        },
+        {
+          "name": "海の生物",
+          "visual_description": "色々な海の生物",
+          "personality": "友好的"
+        }
+      ],
+      "setting": "海",
+      "seasonal_tag": "夏",
+      "pitch": "マリナは海で様々な生物に出会い、多様性の重要性を学ぶ。"
+    },
+    {
+      "id": "4",
+      "title_hint": "雪の日",
+      "theme": "友情",
+      "age_group": "3-5",
+      "characters": [
+        {
+          "name": "エミリー",
+          "visual_description": "コートを着た女の子",
+          "personality": "優しい"
+        },
+        {
+          "name": "雪だるま",
+          "visual_description": "雪だるま",
+          "personality": "楽しい"
+        }
+      ],
+      "setting": "雪の景色",
+      "seasonal_tag": "冬",
+      "pitch": "エミリーは雪の日を楽しみ、友達と雪だるまを作る。"
+    },
+    {
+      "id": "5",
+      "title_hint": "都市の庭",
+      "theme": "環境",
+      "age_group": "6-8",
+      "characters": [
+        {
+          "name": "ジャスミン",
+          "visual_description": "ガーデニングの道具を持った少女",
+          "personality": "創造的"
+        },
+        {
+          "name": "植物",
+          "visual_description": "色々な植物",
+          "personality": "成長する"
+        }
+      ],
+      "setting": "都市",
+      "seasonal_tag": "春",
+      "pitch": "ジャスミンは都市で庭を作り、環境の重要性を学ぶ。"
+    }
+  ]
+}
