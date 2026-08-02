@@ -1,0 +1,109 @@
+{
+  "ideas": [
+    {
+      "id": "1",
+      "title_hint": "森の小さな家",
+      "theme": "環境保護",
+      "age_group": "3-5",
+      "characters": [
+        {
+          "name": "リリー",
+          "visual_description": "小さな女の子",
+          "personality": "好奇心旺盛"
+        },
+        {
+          "name": "森の精霊",
+          "visual_description": "木の葉の髪の女神",
+          "personality": "優しい"
+        }
+      ],
+      "setting": "森",
+      "seasonal_tag": "春",
+      "pitch": "リリーは森で小さな家を見つける。森の精霊と出会い、環境保護の重要性を学ぶ。"
+    },
+    {
+      "id": "2",
+      "title_hint": "宇宙の冒険",
+      "theme": "科学",
+      "age_group": "6-8",
+      "characters": [
+        {
+          "name": "アストロ",
+          "visual_description": "宇宙飛行士のスーツを着た少年",
+          "personality": "勇敢"
+        },
+        {
+          "name": "ロボット",
+          "visual_description": "金属のロボット",
+          "personality": "知的"
+        }
+      ],
+      "setting": "宇宙",
+      "seasonal_tag": "夏",
+      "pitch": "アストロとロボットは宇宙を旅して、惑星や星について学ぶ。"
+    },
+    {
+      "id": "3",
+      "title_hint": "海の秘密",
+      "theme": "多様性",
+      "age_group": "9-12",
+      "characters": [
+        {
+          "name": "マリナ",
+          "visual_description": "水中で泳ぐ少女",
+          "personality": "好奇心旺盛"
+        },
+        {
+          "name": "海の王",
+          "visual_description": "海の王の冠を被った男性",
+          "personality": "知恵のある"
+        }
+      ],
+      "setting": "海",
+      "seasonal_tag": "秋",
+      "pitch": "マリナは海の秘密を探求し、海の王と出会う。海の生物の多様性について学ぶ。"
+    },
+    {
+      "id": "4",
+      "title_hint": "雪の魔法",
+      "theme": "友情",
+      "age_group": "3-5",
+      "characters": [
+        {
+          "name": "ルナ",
+          "visual_description": "雪の女王のドレスを着た少女",
+          "personality": "優しい"
+        },
+        {
+          "name": "雪だるま",
+          "visual_description": "雪だるま",
+          "personality": "楽しい"
+        }
+      ],
+      "setting": "雪の景色",
+      "seasonal_tag": "冬",
+      "pitch": "ルナは雪の魔法を発見し、雪だるまと友達になる。"
+    },
+    {
+      "id": "5",
+      "title_hint": "都市の庭",
+      "theme": "思いやり",
+      "age_group": "6-8",
+      "characters": [
+        {
+          "name": "サラ",
+          "visual_description": "花を育てる少女",
+          "personality": "優しい"
+        },
+        {
+          "name": "庭師",
+          "visual_description": "庭師の帽子を被った男性",
+          "personality": "知恵のある"
+        }
+      ],
+      "setting": "都市",
+      "seasonal_tag": "春",
+      "pitch": "サラは都市の庭で花を育て、庭師と出会う。思いやりの重要性を学ぶ。"
+    }
+  ]
+}
