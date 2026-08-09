@@ -1,0 +1,84 @@
+{
+  "ideas": [
+    {
+      "id": "1",
+      "title_hint": "森の小さな家",
+      "theme": "環境保護",
+      "age_group": "3-5",
+      "characters": [
+        {
+          "name": "ココ",
+          "visual_description": "小さなリス",
+          "personality": "好奇心旺盛"
+        }
+      ],
+      "setting": "森",
+      "seasonal_tag": "春",
+      "pitch": "ココが森の小さな家を作るために、環境保護の重要性を学びます。"
+    },
+    {
+      "id": "2",
+      "title_hint": "海の秘密",
+      "theme": "多様性",
+      "age_group": "6-8",
+      "characters": [
+        {
+          "name": "マリン",
+          "visual_description": "海の生物",
+          "personality": "冒険好き"
+        }
+      ],
+      "setting": "海",
+      "seasonal_tag": "夏",
+      "pitch": "マリンが海の秘密を探索し、多様性の尊重を学びます。"
+    },
+    {
+      "id": "3",
+      "title_hint": "山の伝説",
+      "theme": "友情",
+      "age_group": "9-12",
+      "characters": [
+        {
+          "name": "アキラ",
+          "visual_description": "山の少年",
+          "personality": "勇敢"
+        }
+      ],
+      "setting": "山",
+      "seasonal_tag": "秋",
+      "pitch": "アキラが山の伝説を解き明かし、友情の重要性を学びます。"
+    },
+    {
+      "id": "4",
+      "title_hint": "都市の庭",
+      "theme": "思いやり",
+      "age_group": "3-5",
+      "characters": [
+        {
+          "name": "リラ",
+          "visual_description": "都市の少女",
+          "personality": "優しい"
+        }
+      ],
+      "setting": "都市",
+      "seasonal_tag": "春",
+      "pitch": "リラが都市の庭を作るために、思いやりの重要性を学びます。"
+    },
+    {
+      "id": "5",
+      "title_hint": "星の物語",
+      "theme": "好奇心",
+      "age_group": "6-8",
+      "characters": [
+        {
+          "name": "ソラ",
+          "visual_description": "星の少女",
+          "personality": "好奇心旺盛"
+        }
+      ],
+      "setting": "宇宙",
+      "seasonal_tag": "冬",
+      "pitch": "ソラが星の物語を探索し、好奇心の重要性を学びます。"
+    }
+  ]
+}
