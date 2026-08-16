@@ -1,0 +1,109 @@
+{
+  "ideas": [
+    {
+      "id": "1",
+      "title_hint": "森の友達",
+      "theme": "友情",
+      "age_group": "3-5",
+      "characters": [
+        {
+          "name": "キツネ",
+          "visual_description": "茶色の毛で、長い尾を持つ",
+          "personality": "好奇心旺盛で冒険好き"
+        },
+        {
+          "name": "リス",
+          "visual_description": "小さくて、毛が白と茶色の縞模様",
+          "personality": "おとなしく、優しい"
+        }
+      ],
+      "setting": "森",
+      "seasonal_tag": "春",
+      "pitch": "キツネとリスが森で出会い、友達になる話"
+    },
+    {
+      "id": "2",
+      "title_hint": "海の秘密",
+      "theme": "環境",
+      "age_group": "6-8",
+      "characters": [
+        {
+          "name": "カメ",
+          "visual_description": "緑色の甲羅を背負った、ゆっくり泳ぐ",
+          "personality": "知恵者で、海の秘密を知っている"
+        },
+        {
+          "name": "少年",
+          "visual_description": "海が好きな、元気な少年",
+          "personality": "好奇心旺盛で、海に興味がある"
+        }
+      ],
+      "setting": "海",
+      "seasonal_tag": "夏",
+      "pitch": "少年が海でカメに出会い、海の秘密を学ぶ話"
+    },
+    {
+      "id": "3",
+      "title_hint": "雪の夜の冒険",
+      "theme": "思いやり",
+      "age_group": "9-12",
+      "characters": [
+        {
+          "name": "少女",
+          "visual_description": "雪が好きな、優しい少女",
+          "personality": "思いやりがあり、他人のために行動する"
+        },
+        {
+          "name": "老人",
+          "visual_description": "雪の中で困っている、優しい老人",
+          "personality": "感謝の気持ちを表現する"
+        }
+      ],
+      "setting": "雪の町",
+      "seasonal_tag": "冬",
+      "pitch": "少女が雪の夜に老人を助け、思いやりの大切さを学ぶ話"
+    },
+    {
+      "id": "4",
+      "title_hint": "空の旅",
+      "theme": "好奇心",
+      "age_group": "6-8",
+      "characters": [
+        {
+          "name": "少年",
+          "visual_description": "空が好きな、冒険好きの少年",
+          "personality": "好奇心旺盛で、空の旅に興味がある"
+        },
+        {
+          "name": "鳥",
+          "visual_description": "空を飛ぶ、自由な鳥",
+          "personality": "自由奔放で、空の旅を愛する"
+        }
+      ],
+      "setting": "空",
+      "seasonal_tag": "秋",
+      "pitch": "少年が鳥と空の旅をして、空の秘密を学ぶ話"
+    },
+    {
+      "id": "5",
+      "title_hint": "花の庭",
+      "theme": "多様性",
+      "age_group": "3-5",
+      "characters": [
+        {
+          "name": "花",
+          "visual_description": "色々な種類の花",
+          "personality": "それぞれが違う個性を持つ"
+        },
+        {
+          "name": "少女",
+          "visual_description": "花が好きな、優しい少女",
+          "personality": "花の違いを認め、尊重する"
+        }
+      ],
+      "setting": "花の庭",
+      "seasonal_tag": "春",
+      "pitch": "少女が花の庭で色々な花に出会い、多様性の尊重を学ぶ話"
+    }
+  ]
+}
